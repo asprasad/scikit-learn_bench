@@ -1,6 +1,13 @@
+import os
 import xgboost 
 import json
+from pprint import pprint
 from decision_tree_ensemble import Tree, Ensemble, TreeNode
+
+scriptPath = os.path.realpath(__file__)
+scriptDirPath = os.path.dirname(scriptPath)
+rootPath = os.path.dirname(scriptDirPath)
+modelFileDir = os.path.join(rootPath, "xgb_models")
 
 def ReadModelJSONFile(filename):
     modelJSON = None
@@ -62,8 +69,9 @@ def ConstructTreeEnsembleFromXGB(xgboostJSON):
 
 
 # Args : Model filename, model format (XGBoost, LightGBM)
-filename = "/home/ashwin/ML/scikit-learn_bench/xgb_models/abalone_xgb_model_save.json"
+filename = os.path.join(modelFileDir, "abalone_xgb_model_save.json")
 modelJSON = ReadModelJSONFile(filename)
 ensemble = ConstructTreeEnsembleFromXGB(modelJSON)
-print(ensemble.ComputeTreeSizeStatistics())
+stats = ensemble.ComputeTreeSizeStatistics()
+print(stats)
 
