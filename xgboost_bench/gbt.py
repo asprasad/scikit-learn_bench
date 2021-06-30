@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============================================================================
-
+import sys
+sys.path = sys.path + ["/home/ashwin/ML/scikit-learn_bench"]
 import argparse
 
 import bench
 import numpy as np
 import xgboost as xgb
-
+from xgboost import plot_tree
+import matplotlib.pyplot as plt
 
 def convert_probs_to_classes(y_prob):
     return np.array([np.argmax(y_prob[i]) for i in range(y_prob.shape[0])])
@@ -32,6 +34,7 @@ def convert_xgb_predictions(y_pred, objective):
         y_pred = y_pred.astype(np.int32)
     return y_pred
 
+logfile = open("xgb_bench_log.txt", "w")
 
 parser = argparse.ArgumentParser(description='xgboost gradient boosted trees benchmark')
 
@@ -91,6 +94,13 @@ if params.seed == 12345:
 # Load and convert data
 X_train, X_test, y_train, y_test = bench.load_data(params)
 
+# print("Done loading test data...")
+logfile.write("X_train shape : {shape}\n".format(shape = X_train.shape))
+# print("X_train has inf : ", np.isinf(X_train).any().any())
+logfile.write("y_train shape : {shape}\n".format(shape = y_train.shape))
+logfile.write("X_test shape : {shape}\n".format(shape = X_test.shape))
+logfile.write("y_test shape : {shape}\n".format(shape = y_test.shape))
+
 xgb_params = {
     'booster': 'gbtree',
     'verbosity': 0,
@@ -141,12 +151,14 @@ else:
         xgb_params['num_class'] = params.n_classes
 
 dtrain = xgb.DMatrix(X_train, y_train)
+# print("Done creating training DMatrix. Shape : ", dtrain.num_row(), dtrain.num_col())
 dtest = xgb.DMatrix(X_test, y_test)
-
+# print("Done creating test DMatrix. Shape : ", dtest.num_row(), dtrain.num_col())
 
 def fit(dmatrix):
     if dmatrix is None:
         dmatrix = xgb.DMatrix(X_train, y_train)
+    logfile.write("Number of trees : {n_estimators} \n".format(n_estimators=params.n_estimators))
     return xgb.train(xgb_params, dmatrix, params.n_estimators)
 
 
@@ -160,7 +172,11 @@ else:
             dmatrix = xgb.DMatrix(X_test, y_test)
         return booster.predict(dmatrix)
 
-
+# print("Starting training ....")
+# print("count_dmatrix: ", params.count_dmatrix)
+# params.count_dmatrix = False
+params.box_filter_measurements = 1
+logfile.write("Running training {times} times.\n".format(times=params.box_filter_measurements))
 fit_time, booster = bench.measure_function_time(
     fit, None if params.count_dmatrix else dtrain, params=params)
 train_metric = metric_func(
@@ -168,10 +184,21 @@ train_metric = metric_func(
         booster.predict(dtrain),
         params.objective),
     y_train)
-
+logfile.write("Booster best ntree limit : " + str(booster.best_ntree_limit) + "\n")
+logfile.write("Running inference {times} times.\n".format(times=params.box_filter_measurements))
+# print("Starting inference ....")
 predict_time, y_pred = bench.measure_function_time(
     predict, None if params.inplace_predict or params.count_dmatrix else dtest, params=params)
 test_metric = metric_func(convert_xgb_predictions(y_pred, params.objective), y_test)
+
+# plot_tree(booster)
+# plt.show()
+
+# print("Training time : ", fit_time)
+# print("Predict time : ", predict_time)
+
+booster.save_model('xgb_models/{dataset_name}_xgb_model_save.json'.format(dataset_name = params.dataset_name))
+# booster.dump_model('xgb_model_dump.json')
 
 bench.print_output(library='xgboost', algorithm=f'gradient_boosted_trees_{task}',
                    stages=['training', 'prediction'],
@@ -179,3 +206,5 @@ bench.print_output(library='xgboost', algorithm=f'gradient_boosted_trees_{task}'
                    times=[fit_time, predict_time], accuracy_type=metric_name,
                    accuracies=[train_metric, test_metric], data=[X_train, X_test],
                    alg_instance=booster, alg_params=xgb_params)
+
+logfile.close()

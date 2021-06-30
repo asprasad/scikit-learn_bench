@@ -112,38 +112,38 @@ def get_hw_parameters() -> Dict[str, Union[Dict[str, Any], float]]:
         pass
 
     # get Nvidia GPU information
-    try:
-        gpu_info, _ = read_output_from_command(
-            'nvidia-smi --query-gpu=name,memory.total,driver_version,pstate '
-            '--format=csv,noheader')
-        gpu_info_arr = gpu_info.split(', ')
-        hw_params['GPU Nvidia'] = {
-            'Name': gpu_info_arr[0],
-            'Memory size': gpu_info_arr[1],
-            'Performance mode': gpu_info_arr[3]
-        }
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
+    # try:
+    #     gpu_info, _ = read_output_from_command(
+    #         'nvidia-smi --query-gpu=name,memory.total,driver_version,pstate '
+    #         '--format=csv,noheader')
+    #     gpu_info_arr = gpu_info.split(', ')
+    #     hw_params['GPU Nvidia'] = {
+    #         'Name': gpu_info_arr[0],
+    #         'Memory size': gpu_info_arr[1],
+    #         'Performance mode': gpu_info_arr[3]
+    #     }
+    # except (FileNotFoundError, json.JSONDecodeError):
+    #     pass
     return hw_params
 
 
 def get_sw_parameters() -> Dict[str, Dict[str, Any]]:
     sw_params = {}
-    try:
-        gpu_info, _ = read_output_from_command(
-            'nvidia-smi --query-gpu=name,memory.total,driver_version,pstate '
-            '--format=csv,noheader')
-        info_arr = gpu_info.split(', ')
-        sw_params['GPU_driver'] = {'version': info_arr[2]}
-        # alert if GPU is already running any processes
-        gpu_processes, _ = read_output_from_command(
-            'nvidia-smi --query-compute-apps=name,pid,used_memory '
-            '--format=csv,noheader')
-        if gpu_processes != '':
-            print(f'There are running processes on GPU:\n{gpu_processes}',
-                  file=sys.stderr)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
+    # try:
+    #     gpu_info, _ = read_output_from_command(
+    #         'nvidia-smi --query-gpu=name,memory.total,driver_version,pstate '
+    #         '--format=csv,noheader')
+    #     info_arr = gpu_info.split(', ')
+    #     sw_params['GPU_driver'] = {'version': info_arr[2]}
+    #     # alert if GPU is already running any processes
+    #     gpu_processes, _ = read_output_from_command(
+    #         'nvidia-smi --query-compute-apps=name,pid,used_memory '
+    #         '--format=csv,noheader')
+    #     if gpu_processes != '':
+    #         print(f'There are running processes on GPU:\n{gpu_processes}',
+    #               file=sys.stderr)
+    # except (FileNotFoundError, json.JSONDecodeError):
+    #     pass
 
     # get python packages info from conda
     try:
