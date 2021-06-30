@@ -1,0 +1,35 @@
+{
+    "common": {
+        "lib": "xgboost",
+        "data-format": "pandas",
+        "data-order": "F",
+        "dtype": "float32",
+        "algorithm": "gbt",
+        "tree-method": "hist",
+        "count-dmatrix": "",
+        "max-depth": 8,
+        "learning-rate": 0.1,
+        "reg-lambda": 1,
+        "max-leaves": 256
+    },
+    "cases": [
+        {
+            "objective": "binary:logistic",
+            "scale-pos-weight": 2.1067817411664587,
+            "dataset": [
+                {
+                    "source": "npy",
+                    "name": "airline",
+                    "training": {
+                        "x": "data/airline_x_train.npy",
+                        "y": "data/airline_y_train.npy"
+                    },
+                    "testing": {
+                        "x": "data/airline_x_test.npy",
+                        "y": "data/airline_y_test.npy"
+                    }
+                }
+            ]
+        }
+    ]
+}

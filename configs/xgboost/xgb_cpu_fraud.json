@@ -1,0 +1,35 @@
+{
+    "common": {
+        "lib": "xgboost",
+        "data-format": "pandas",
+        "data-order": "F",
+        "dtype": "float32",
+        "algorithm": "gbt",
+        "tree-method": "hist",
+        "count-dmatrix": "",
+        "max-depth": 8,
+        "learning-rate": 0.1,
+        "reg-lambda": 1,
+        "max-leaves": 256
+    },
+    "cases": [
+        {
+            "objective": "binary:logistic",
+            "scale-pos-weight": 578.2868020304569,
+            "dataset": [
+                {
+                    "source": "npy",
+                    "name": "fraud",
+                    "training": {
+                        "x": "data/fraud_x_train.npy",
+                        "y": "data/fraud_y_train.npy"
+                    },
+                    "testing": {
+                        "x": "data/fraud_x_test.npy",
+                        "y": "data/fraud_y_test.npy"
+                    }
+                }
+            ]
+        }
+    ]
+}
