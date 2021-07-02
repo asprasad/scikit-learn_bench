@@ -7,6 +7,16 @@ class NodeType(Enum):
     Numerical = 1
     Categorical = 2
 
+def AggregateListOfLists(lst):
+    agg = []
+    for l in lst:
+        if len(l) > len(agg):
+            n = len(l) - len(agg)
+            agg = agg + [0] * n
+        for i in range(len(l)):
+            agg[i] += l[i]
+    return agg
+
 class TreeNode:
     def __init__(self, nodeType, threshold, featureIndex) -> None:
         self.type = nodeType
@@ -32,6 +42,31 @@ class TreeNode:
             depth = self.tree.GetNode(self.parent).Depth() + 1
         self.depth = depth
         return depth
+    
+    def NumberOfFeaturesInPathToRoot(self):
+        if self.IsRoot():
+            return 1
+        features = []
+        node = self
+        while not node.IsRoot():
+            if not node.IsLeaf():
+                features.append(node.featureIndex)
+            node = node.tree.GetNode(node.parent)
+        return len(set(features))
+    
+    def FeatureUsesInPathToRoot(self):
+        assert self.IsLeaf()
+        node = self
+        featureUses = dict()
+        while not node.IsRoot():
+            if not node.IsLeaf():
+                if not node.featureIndex in featureUses.keys():
+                    featureUses[node.featureIndex] = 1
+                else:
+                    featureUses[node.featureIndex] += 1 
+            node = node.tree.GetNode(node.parent)
+        return sorted(featureUses.values(), reverse=True)
+
 
 class Tree:
     def __init__(self, id, num_nodes, num_features) -> None:
@@ -74,6 +109,29 @@ class Tree:
     def LeafDepths(self):
         return [n.Depth() for n in self.leaves] 
 
+    def NumberOfFeatures(self):
+        nonLeaves = [n for n in self.nodes if n not in self.leaves]
+        featureIdxs = [n.featureIndex for n in nonLeaves]
+        featureSet = set(featureIdxs)
+        return len(featureSet)
+    
+    def FeatureUses(self):
+        nonLeaves = [n for n in self.nodes if n not in self.leaves]
+        featureUses = dict()
+        for node in nonLeaves:
+            if not node.featureIndex in featureUses.keys():
+                featureUses[node.featureIndex] = 1
+                continue
+            featureUses[node.featureIndex] += 1
+        return featureUses
+
+    def NumberOfFeaturesUsedToLeaves(self):
+        return [n.NumberOfFeaturesInPathToRoot() for n in self.leaves]
+    
+
+    def SortedAggregateFeaturesUsesOnPath(self):
+        featureUsesOnPaths = [leaf.FeatureUsesInPathToRoot() for leaf in self.leaves]
+        return AggregateListOfLists(featureUsesOnPaths)
 
 class Feature:
     def __init__(self, name, type, index) -> None:
@@ -86,10 +144,12 @@ class Feature:
 #       - Per tree stats
 # 2. Num features used in each tree
 # 3. # times each feature is used in each tree
+#   - Sort for each tree and then aggregate so that the most used feature per tree are aggregated together
 # 4. # times each feature is used in a path to a leaf/ # features used in each path
 ListStats = namedtuple("ListStats", ["min", "max", "median", "mean", "std_dev"])
-TreeStats = namedtuple("TreeStats", ["num_trees", "tree_size_stats", \
-                                     "leaves_stats", "skew_stats", "leaf_depth_stats"])
+TreeStats = namedtuple("TreeStats", ["num_trees", "num_features", "tree_size_stats", \
+                                     "leaves_stats", "skew_stats", "leaf_depth_stats", \
+                                     "feature_set", "features_on_paths", "feature_uses", "sorted_feature_uses_trees", "sorted_feature_uses_paths"])
 
 def ComputeListStats(lst):
     return ListStats(min(lst), max(lst), statistics.median(lst), statistics.mean(lst), statistics.stdev(lst))
@@ -107,14 +167,41 @@ class Ensemble:
     def AddTree(self, tree) -> None:
         self.trees.append(tree)
     
+    def AggregateFeatureUses(self):
+        featureUses = [tree.FeatureUses() for tree in self.trees]
+        aggregateFeatureUses = dict()
+        aggregateSortedUses = []        
+        for featureUse in featureUses:
+            sortedUses = sorted(featureUse.values(), reverse=True)
+            if len(sortedUses) > len(aggregateSortedUses):
+                n = len(sortedUses) - len(aggregateSortedUses)
+                aggregateSortedUses = aggregateSortedUses + [0] * n
+            for i in range(len(sortedUses)):
+                aggregateSortedUses[i] += sortedUses[i]
+
+            for featureIdx, uses in featureUse.items():
+                if not featureIdx in aggregateFeatureUses.keys():
+                    aggregateFeatureUses[featureIdx] = uses
+                    continue
+                aggregateFeatureUses[featureIdx] += uses
+        return aggregateFeatureUses, aggregateSortedUses
+
+    def AggregateSortedFeatureUsesOnPath(self):
+        featureUses = [t.SortedAggregateFeaturesUsesOnPath() for t in self.trees]
+        return AggregateListOfLists(featureUses)
+
     def ComputeTreeSizeStatistics(self):
         sizes = [tree.NumberOfNodes() for tree in self.trees]
         leaves = [tree.num_leaves for tree in self.trees]
         skews = [tree.Skew() for tree in self.trees]
         leaf_depths = [d for tree in self.trees for d in tree.LeafDepths()]
-
-        return TreeStats(len(self.trees), ComputeListStats(sizes), ComputeListStats(leaves), \
-                         ComputeListStats(skews), ComputeListStats(leaf_depths))
+        numFeatures = [tree.NumberOfFeatures() for tree in self.trees]
+        featuresOnPath = [d for tree in self.trees for d in tree.NumberOfFeaturesUsedToLeaves()]
+        aggregateFeatureUses, aggregateSortedUses = self.AggregateFeatureUses()
+        sortedFeatureUsesOnPathSToRoot = self.AggregateSortedFeatureUsesOnPath()
+        return TreeStats(len(self.trees), len(self.features), ComputeListStats(sizes), ComputeListStats(leaves), \
+                         ComputeListStats(skews), ComputeListStats(leaf_depths), ComputeListStats(numFeatures), \
+                         ComputeListStats(featuresOnPath), aggregateFeatureUses, aggregateSortedUses, sortedFeatureUsesOnPathSToRoot)
     
     
 
