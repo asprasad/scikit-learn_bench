@@ -20,8 +20,8 @@ import argparse
 import bench
 import numpy as np
 import xgboost as xgb
-from xgboost import plot_tree
-import matplotlib.pyplot as plt
+# from xgboost import plot_tree
+# import matplotlib.pyplot as plt
 
 def convert_probs_to_classes(y_prob):
     return np.array([np.argmax(y_prob[i]) for i in range(y_prob.shape[0])])
