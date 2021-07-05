@@ -69,7 +69,7 @@ def ConstructTreeEnsembleFromXGB(xgboostJSON):
 
 
 # Args : Model filename, model format (XGBoost, LightGBM)
-filename = os.path.join(modelFileDir, "abalone_xgb_model_save.json")
+filename = os.path.join(modelFileDir, "year_prediction_msd_xgb_model_save.json")
 modelJSON = ReadModelJSONFile(filename)
 ensemble = ConstructTreeEnsembleFromXGB(modelJSON)
 stats = ensemble.ComputeTreeSizeStatistics()

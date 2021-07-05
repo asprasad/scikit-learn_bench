@@ -12,10 +12,15 @@ def AggregateListOfLists(lst):
     for l in lst:
         if len(l) > len(agg):
             n = len(l) - len(agg)
-            agg = agg + [0] * n
+            for j in range(n):
+                agg.append([])
         for i in range(len(l)):
-            agg[i] += l[i]
-    return agg
+            agg[i].append(l[i])
+    
+    stats = []
+    for i in range(len(agg)):
+        stats.append(ComputeListStats(agg[i]))
+    return stats
 
 class TreeNode:
     def __init__(self, nodeType, threshold, featureIndex) -> None:
@@ -131,7 +136,7 @@ class Tree:
 
     def SortedAggregateFeaturesUsesOnPath(self):
         featureUsesOnPaths = [leaf.FeatureUsesInPathToRoot() for leaf in self.leaves]
-        return AggregateListOfLists(featureUsesOnPaths)
+        return featureUsesOnPaths
 
 class Feature:
     def __init__(self, name, type, index) -> None:
@@ -187,7 +192,7 @@ class Ensemble:
         return aggregateFeatureUses, aggregateSortedUses
 
     def AggregateSortedFeatureUsesOnPath(self):
-        featureUses = [t.SortedAggregateFeaturesUsesOnPath() for t in self.trees]
+        featureUses = [uses for t in self.trees for uses in t.SortedAggregateFeaturesUsesOnPath()]
         return AggregateListOfLists(featureUses)
 
     def ComputeTreeSizeStatistics(self):
