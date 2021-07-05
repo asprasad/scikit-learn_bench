@@ -66,6 +66,13 @@ def read_output_from_command(command: str,
                          stderr=subprocess.PIPE, encoding='utf-8', env=env)
     return res.stdout[:-1], res.stderr[:-1]
 
+def run_command(command: str,
+                env: Dict[str, str] = os.environ.copy()) -> None:
+    if "PYTHONPATH" in env:
+        env["PYTHONPATH"] += ":" + os.path.dirname(os.path.abspath(__file__))
+    else:
+        env["PYTHONPATH"] = os.path.dirname(os.path.abspath(__file__))
+    res = subprocess.run(command.split(' '), encoding='utf-8', env=env)
 
 def parse_lscpu_lscl_info(command_output: str) -> Dict[str, str]:
     res: Dict[str, str] = {}

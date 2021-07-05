@@ -30,6 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--configs', metavar='ConfigPath', type=str,
                         default='configs/config_example.json',
                         help='Path to configuration files')
+    parser.add_argument("--profile", default=False, action='store_true')
     parser.add_argument('--dummy-run', default=False, action='store_true',
                         help='Run configuration parser and datasets generation '
                              'without benchmarks running')
@@ -180,10 +181,16 @@ if __name__ == '__main__':
                         logging.info(command)
                         if not args.dummy_run:
                             case = f'{lib},{algorithm} ' + case
-                            stdout, stderr = utils.read_output_from_command(
-                                command, env=os.environ.copy())
-                            stdout, extra_stdout = utils.filter_stdout(stdout)
-                            stderr = utils.filter_stderr(stderr)
+                            if not args.profile:
+                                stdout, stderr = utils.read_output_from_command(
+                                    command, env=os.environ.copy())
+                                stdout, extra_stdout = utils.filter_stdout(stdout)
+                                stderr = utils.filter_stderr(stderr)
+                            else:
+                                utils.run_command(command, env=os.environ.copy())
+                                extra_stdout = ''
+                                stdout = ''
+                                stderr = ''
 
                             print(stdout, end='\n')
 

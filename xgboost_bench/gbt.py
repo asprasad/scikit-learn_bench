@@ -14,7 +14,11 @@
 # limitations under the License.
 # ===============================================================================
 import sys
-sys.path = sys.path + ["/home/ashwin/ML/scikit-learn_bench"]
+import os
+scriptPath = os.path.realpath(__file__)
+scriptDir = os.path.dirname(scriptPath)
+benchDir = os.path.dirname(scriptDir)
+sys.path = sys.path + [benchDir]
 import argparse
 
 import bench
@@ -22,6 +26,11 @@ import numpy as np
 import xgboost as xgb
 # from xgboost import plot_tree
 # import matplotlib.pyplot as plt
+
+RunningInferenceProfiling = True
+# These things printed on the screen will cause a test failure. Ignore them when you're running the profiling.
+if RunningInferenceProfiling==True:
+    print("Starting xgboost benchmark. PID : ", os.getpid())
 
 def convert_probs_to_classes(y_prob):
     return np.array([np.argmax(y_prob[i]) for i in range(y_prob.shape[0])])
@@ -172,10 +181,9 @@ else:
             dmatrix = xgb.DMatrix(X_test, y_test)
         return booster.predict(dmatrix)
 
-# print("Starting training ....")
-# print("count_dmatrix: ", params.count_dmatrix)
-# params.count_dmatrix = False
-params.box_filter_measurements = 1
+if RunningInferenceProfiling == True:
+    params.box_filter_measurements = 1
+
 logfile.write("Running training {times} times.\n".format(times=params.box_filter_measurements))
 fit_time, booster = bench.measure_function_time(
     fit, None if params.count_dmatrix else dtrain, params=params)
@@ -186,19 +194,23 @@ train_metric = metric_func(
     y_train)
 logfile.write("Booster best ntree limit : " + str(booster.best_ntree_limit) + "\n")
 logfile.write("Running inference {times} times.\n".format(times=params.box_filter_measurements))
-# print("Starting inference ....")
-predict_time, y_pred = bench.measure_function_time(
+
+if RunningInferenceProfiling==True:
+    params.box_filter_measurements = 100
+    input("Press enter to start inference ...")
+    predict_time, y_pred = bench.measure_function_time(
+        predict, dtest, params=params)
+    test_metric = metric_func(convert_xgb_predictions(y_pred, params.objective), y_test)
+    input("Done inferencing ... Press enter to exit.")
+else:
+    predict_time, y_pred = bench.measure_function_time(
     predict, None if params.inplace_predict or params.count_dmatrix else dtest, params=params)
-test_metric = metric_func(convert_xgb_predictions(y_pred, params.objective), y_test)
+    test_metric = metric_func(convert_xgb_predictions(y_pred, params.objective), y_test)
 
 # plot_tree(booster)
 # plt.show()
 
-# print("Training time : ", fit_time)
-# print("Predict time : ", predict_time)
-
 booster.save_model('xgb_models/{dataset_name}_xgb_model_save.json'.format(dataset_name = params.dataset_name))
-# booster.dump_model('xgb_model_dump.json')
 
 bench.print_output(library='xgboost', algorithm=f'gradient_boosted_trees_{task}',
                    stages=['training', 'prediction'],
