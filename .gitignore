@@ -16,3 +16,5 @@ data
 # Results
 results*.json
 *.xlsx
+vtune*
+xgb_bench_log.txt
