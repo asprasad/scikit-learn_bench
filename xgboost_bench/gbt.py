@@ -13,8 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============================================================================
-import sys
+RunningInferenceProfiling = True
 import os
+# This is a hack to make XGBoost run single threaded. 
+if RunningInferenceProfiling:
+    os.environ['OMP_NUM_THREADS'] = "1"
+import sys
 scriptPath = os.path.realpath(__file__)
 scriptDir = os.path.dirname(scriptPath)
 benchDir = os.path.dirname(scriptDir)
@@ -23,11 +27,13 @@ import argparse
 
 import bench
 import numpy as np
+import pandas as pd
 import xgboost as xgb
+import time
+import math
 # from xgboost import plot_tree
 # import matplotlib.pyplot as plt
 
-RunningInferenceProfiling = True
 # These things printed on the screen will cause a test failure. Ignore them when you're running the profiling.
 if RunningInferenceProfiling==True:
     print("Starting xgboost benchmark. PID : ", os.getpid())
@@ -100,6 +106,8 @@ params = bench.parse_args(parser)
 if params.seed == 12345:
     params.seed = 0
 
+model_file_path = 'xgb_models/{dataset_name}_xgb_model_save.json'.format(dataset_name = params.dataset_name)
+
 # Load and convert data
 X_train, X_test, y_train, y_test = bench.load_data(params)
 
@@ -164,12 +172,21 @@ dtrain = xgb.DMatrix(X_train, y_train)
 dtest = xgb.DMatrix(X_test, y_test)
 # print("Done creating test DMatrix. Shape : ", dtest.num_row(), dtrain.num_col())
 
+def RepeatDF(df, n):
+    newdf = pd.DataFrame(np.repeat(df.values, n, axis=0))
+    newdf.columns = df.columns
+    return newdf
+
+def RepeatSeries(s, n):
+    newSeries = pd.Series([])
+    newSeries.append([s]*n, ignore_index=True)
+    return newSeries
+
 def fit(dmatrix):
     if dmatrix is None:
         dmatrix = xgb.DMatrix(X_train, y_train)
     logfile.write("Number of trees : {n_estimators} \n".format(n_estimators=params.n_estimators))
     return xgb.train(xgb_params, dmatrix, params.n_estimators)
-
 
 if params.inplace_predict:
     def predict(*args):
@@ -181,27 +198,75 @@ else:
             dmatrix = xgb.DMatrix(X_test, y_test)
         return booster.predict(dmatrix)
 
+def ComputeTestSetParamsForProfiling(dmatrix):
+    print("Testing inference time on ", dmatrix.num_row(), " rows")
+    start = time.time()
+    booster.predict(dmatrix)
+    end = time.time()
+    predictionTime = end - start
+    # Some small benchmarks seem to be much faster on subsequent runs!
+    if predictionTime < 10:
+        start = time.time()
+        booster.predict(dmatrix)
+        end = time.time()
+        predictionTime = end - start
+
+    print("Estimated prediction time for X_train : ", predictionTime)
+    minPredictionTime = 0.5 # compute how many times to replicate so each call takes 500ms
+    numReps = math.ceil(minPredictionTime/predictionTime)
+    numReps = 250 if numReps>250 else numReps
+    # limit the number of rows we end up creating
+    numRows = dmatrix.num_row() * numReps
+    rowLimit = 2000000
+    if numRows > rowLimit:
+        numReps = math.ceil(rowLimit/dmatrix.num_row())
+    return numReps*predictionTime, numReps
+
+
 if RunningInferenceProfiling == True:
     params.box_filter_measurements = 1
 
-logfile.write("Running training {times} times.\n".format(times=params.box_filter_measurements))
-fit_time, booster = bench.measure_function_time(
-    fit, None if params.count_dmatrix else dtrain, params=params)
-train_metric = metric_func(
-    convert_xgb_predictions(
-        booster.predict(dtrain),
-        params.objective),
-    y_train)
-logfile.write("Booster best ntree limit : " + str(booster.best_ntree_limit) + "\n")
+noTraining = os.path.exists(model_file_path) and RunningInferenceProfiling
+
+booster = None
+if not noTraining:
+    logfile.write("Running training {times} times.\n".format(times=params.box_filter_measurements))
+    fit_time, booster = bench.measure_function_time(
+        fit, None if params.count_dmatrix else dtrain, params=params)
+    train_metric = metric_func(
+        convert_xgb_predictions(
+            booster.predict(dtrain),
+            params.objective),
+        y_train)
+    booster.save_model(model_file_path)
+else:
+    print("Skipping training. Loading model from ", model_file_path)
+    booster = xgb.Booster(model_file=model_file_path)
+    fit_time = 0
+    train_metric = 0
+    print("Done loading model")
+
+
+# logfile.write("Booster best ntree limit : " + str(booster.best_ntree_limit) + "\n")
 logfile.write("Running inference {times} times.\n".format(times=params.box_filter_measurements))
 
 if RunningInferenceProfiling==True:
-    params.box_filter_measurements = 100
+    print("Setting n_jobs to 1 on the model to ensure single threaded execution")
+    booster.set_param('n_jobs', 1)
+    predictionTime, numReps = ComputeTestSetParamsForProfiling(dtrain)
+    print("Replicating X_train ", numReps, " times")
+    X_test = RepeatDF(X_train, numReps)
+    dtest = xgb.DMatrix(X_test)
+    # Get about 10s worth of computation 
+    params.box_filter_measurements = math.ceil(10/predictionTime)
+    print("Running inference on ", dtest.num_row(), " rows and repeating ", params.box_filter_measurements, " times")
+
     input("Press enter to start inference ...")
-    predict_time, y_pred = bench.measure_function_time(
-        predict, dtest, params=params)
-    test_metric = metric_func(convert_xgb_predictions(y_pred, params.objective), y_test)
+    predict_time, y_pred = bench.measure_function_time(predict, dtest, params=params)
     input("Done inferencing ... Press enter to exit.")
+
+    test_metric = -1
+    # test_metric = metric_func(convert_xgb_predictions(y_pred, params.objective), y_test)
 else:
     predict_time, y_pred = bench.measure_function_time(
     predict, None if params.inplace_predict or params.count_dmatrix else dtest, params=params)
@@ -209,8 +274,6 @@ else:
 
 # plot_tree(booster)
 # plt.show()
-
-booster.save_model('xgb_models/{dataset_name}_xgb_model_save.json'.format(dataset_name = params.dataset_name))
 
 bench.print_output(library='xgboost', algorithm=f'gradient_boosted_trees_{task}',
                    stages=['training', 'prediction'],
