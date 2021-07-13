@@ -1,0 +1,35 @@
+{
+    "common": {
+        "lib": "daal_xgboost",
+        "data-format": "pandas",
+        "data-order": "F",
+        "dtype": "float32",
+        "algorithm": "daal_xgb",
+        "tree-method": "hist",
+        "count-dmatrix": "",
+        "max-depth": 8,
+        "learning-rate": 0.1,
+        "reg-lambda": 1,
+        "max-leaves": 256
+    },
+    "cases": [
+        {
+            "objective": "binary:logistic",
+            "scale-pos-weight": 173.63348001466812,
+            "dataset": [
+                {
+                    "source": "npy",
+                    "name": "bosch",
+                    "training": {
+                        "x": "data/bosch_x_train.npy",
+                        "y": "data/bosch_y_train.npy"
+                    },
+                    "testing": {
+                        "x": "data/bosch_x_test.npy",
+                        "y": "data/bosch_y_test.npy"
+                    }
+                }
+            ]
+        }
+   ]
+}

@@ -18,3 +18,4 @@ results*.json
 *.xlsx
 vtune*
 xgb_bench_log.txt
+xgb_daal_bench_log.txt

@@ -1,0 +1,34 @@
+{
+    "common": {
+        "lib": "daal_xgboost",
+        "data-format": "pandas",
+        "data-order": "F",
+        "dtype": "float32",
+        "algorithm": "daal_xgb",
+        "tree-method": "hist",
+        "count-dmatrix": ""
+    },
+    "cases": [
+        {
+            "dataset": [
+                {
+                    "source": "npy",
+                    "name": "plasticc",
+                    "training": {
+                        "x": "data/plasticc_x_train.npy",
+                        "y": "data/plasticc_y_train.npy"
+                    },
+                    "testing": {
+                        "x": "data/plasticc_x_test.npy",
+                        "y": "data/plasticc_y_test.npy"
+                    }
+                }
+            ],
+            "n-estimators": 60,
+            "objective": "multi:softprob",
+            "max-depth": 7,
+            "subsample": 0.7,
+            "colsample-bytree": 0.7
+        }
+    ]
+}
