@@ -44,7 +44,9 @@ import daal4py as d4p
 from sklearn.metrics import mean_squared_error
 # These things printed on the screen will cause a test failure. Ignore them when you're running the profiling.
 if RunningInferenceProfiling==True:
-    print("Starting xgboost benchmark. PID : ", os.getpid())
+    print("Starting daal xgboost benchmark. PID : ", os.getpid())
+    d4p.daalinit(1)
+    print("Running DAAL with ", d4p.num_threads(), " threads.")
 
 def convert_probs_to_classes(y_prob):
     return np.array([np.argmax(y_prob[i]) for i in range(y_prob.shape[0])])
